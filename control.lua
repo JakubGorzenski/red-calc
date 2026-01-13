@@ -1,16 +1,18 @@
 --  any gui whose name start with '!', and belongs to "red-calc" will be treated as interactible
 
+
+
 require "calc_layout"
-require "calc_operation"
+require "calc_input"
 require "calc_display"
 
-function toggle_red_calc(player)
-    local p = player
+function toggle_red_calc(event)
+    local p = game.players[event.player_index]
     local s = p.gui.screen
 
     -- make button toggleable
-    local state = not p.is_shortcut_toggled("red-calc")
-    p.set_shortcut_toggled("red-calc", state)
+    local state = not p.is_shortcut_toggled("red-calc-toggle")
+    p.set_shortcut_toggled("red-calc-toggle", state)
 
     
     if(s.red_calc ~= nil) then
@@ -26,20 +28,6 @@ function toggle_red_calc(player)
     end
 end
 
-
-
-function shortcut_handler(event)
-    -- is this my event
-    if(event.prototype_name ~= "red-calc") then
-        return
-    end
-
-    toggle_red_calc(game.players[event.player_index])
-end
-
-script.on_event(defines.events.on_lua_shortcut, shortcut_handler)
-
-
 prec = "%.2f"
 function button_handler(event)
     local button = event.element
@@ -49,17 +37,23 @@ function button_handler(event)
     end
 
     if(button.name == "!close") then
-        toggle_red_calc(game.players[event.player_index])
+        toggle_red_calc(event)
         return
     end
 
-    local p = game.players[event.player_index]
     if button.type == "switch" then
         prec = ({left="%.2f", none="%.4f", right="%.8f"})[button.switch_state]
     end
-    on_key_press(button.name:sub(2, 3))
 
-    display(access_player_display(p), mp_num)
+    on_key_press(event.player_index, button.name:sub(2, 3))
 end
 
+
+script.on_event(defines.events.on_player_created,
+    function(event) storage[event.player_index] = {} end)
+
+script.on_event(defines.events.on_lua_shortcut,
+    function(event) if event.prototype_name == "red-calc-toggle" then toggle_red_calc(event) end end)
+
+script.on_event("red-calc-toggle", toggle_red_calc)
 script.on_event(defines.events.on_gui_click, button_handler)

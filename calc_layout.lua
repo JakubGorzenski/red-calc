@@ -1,7 +1,7 @@
 --  contains calculator layout, and layout accessors
 
-function access_player_display(player)
-    return player.gui.screen.red_calc.dp_frame.display
+function access_player_display(player_index)
+    return game.players[player_index].gui.screen.red_calc.dp_frame.display
 end
 
 
@@ -51,7 +51,7 @@ function create_red_calc(screen, scale)
             local buttons = {
                 "sb", "7d","8d","9d", "DR","Cr",
                 "cb", "4d","5d","6d", "*g","/g",
-                "bb", "1d","2d","3d", "+g","-g",
+                "bb", "1d","2d","3d", "+g","~g",
                 "ab", "fd","0d",".d", "(g","=g",
             }
             for i,v in ipairs(buttons) do

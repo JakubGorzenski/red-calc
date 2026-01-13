@@ -1,17 +1,22 @@
 
 data:extend{{
-    type = "shortcut",
-    name = "red-calc",
-    order = "zzz",
---  localised_description = "advanced-calculator.shortcut-description",
-
+    type = "custom-input",
+    name = "red-calc-toggle",
+    key_sequence = "CONTROL + SHIFT + C",
     action = "lua",
-    icon = "__core__/graphics/icons/mip/editor-tick-sixty-icon.png",
-    icon_size = 32,
-    small_icon = "__core__/graphics/icons/mip/editor-tick-sixty-icon.png",
-    small_icon_size=32,
+},
+{
+    type = "shortcut",
+    name = "red-calc-toggle",
+    order = "zzz",
+    action = "lua",
+    localised_name = {"red-calc.shortcut-name"},
+    associated_control_input = "red-calc-toggle",
+    icon = "__red-calc__/toggle-red-calc-x56.png",
+    icon_size = 56,
+    small_icon = "__red-calc__/toggle-red-calc-x24.png",
+    small_icon_size = 24,
     toggleable = true,
---  associated_control_input = "",
 },
 {
     type = "font",
