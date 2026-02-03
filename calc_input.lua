@@ -3,23 +3,21 @@
 
 local state_t
 
-
-
-function on_key_press(player_index, key)
+function on_key_press(p_storage, key)
     --  global varibles created here!
-    input = storage[player_index].input or ""
-    state = storage[player_index].state or "first"
+    input = p_storage.input or ""
+    state = p_storage.state or "first"
 
     local func = next_state(key)
     if func then
         input = input .. key
         func()
         
-        storage[player_index].input = input
-        storage[player_index].state = state
-
-        display(player_index, input)
+        p_storage.input = input
+        p_storage.state = state
+        return true
     end
+    return false
 end
 
 
@@ -67,6 +65,10 @@ function change_operation()
         {["*"] = "^", ["/"] = ",", ["+"] = "A", ["~"] = "S"})
 end
 
+function remove_frc()
+    inpur = input:gsub("ff$", "")
+end
+
 function next_state(key)
     for i = 1, #state_t[state], 1 do
         local st = state_t[state][i]
@@ -88,33 +90,42 @@ state_t = {
     value = { recursive = true,
         {"[-~]",        "negative", function() input = input:gsub("~$", "-") end},
         {"%d",          "number"},
-        {"%.",          "number_1"},
+        {"%.",          "num_dot"},
         {"[sabc]",      "memory"}},
 --  all number states
     negative = {
         {"%(",          "negative", append_bracket},
         {"[sabc]",      "negative", append_number},
         {"%d",          "number",   append_number},
-        {"%.",          "number_1", append_number}},
+        {"%.",          "num_dot",  append_number}},
     number = {
         {"%(",          "number",   append_bracket},
         {"[%dsabc]",    "number",   append_number},
-        {"[.f]",        "number_1", append_number},
+        {"%.",          "num_dot",  append_number},
+        {"f",           "num_frc",  append_number},
         {"[*/+~^,AS=]", "operation"}},
-    number_1 = {
-        {"%(",          "number_1", append_bracket},
+    num_dot = {
+        {"%(",          "num_dot",  append_bracket},
+        {"[%dsabc]",    "decimal",  append_number}},
+    decimal = {
+        {"%(",          "decimal",  append_bracket},
+        {"[%dsabc]",    "decimal",  append_number},
+        {"f",           "number_3", append_number},
+        {"[*/+~^,AS=]", "operation"}},
+    num_frc = {
+        {"%(",          "num_frc", append_bracket},
         {"[%dsabc]",    "number_2", append_number}},
     number_2 = {
         {"%(",          "number_2", append_bracket},
         {"[%dsabc]",    "number_2", append_number},
-        {"f",           "number_3", append_number},
+        {"f",           "num_frc_2",append_number},
         {"[*/+~^,AS=]", "operation"}},
+    num_frc_2 = {
+        {"%(",          "num_frc_2",append_bracket},
+        {"[%dsabc]",    "number_3", append_number}},
     number_3 = {
         {"%(",          "number_3", append_bracket},
-        {"[%dsabc]",    "number_4", append_number}},
-    number_4 = {
-        {"%(",          "number_4", append_bracket},
-        {"[%dsabc]",    "number_4", append_number},
+        {"[%dsabc]",    "number_3", append_number},
         {"[*/+~^,AS=]", "operation"}},
 --  a, b and c memory reads
     memory = { recursive = true,
@@ -186,18 +197,18 @@ state_t = {
         {"%(",          "first"},
         {"[-~%d.sabc]", "value"}},
     op_mod_s = {
-        {"[%d.f]",          "op_mod_s",     varible_select},
-        {"[+~]",            "op_mod_s",     varible_increment},
-        {"=",               "first"}},
+        {"[%d.f]",      "op_mod_s", varible_select},
+        {"[+~]",        "op_mod_s", varible_increment},
+        {"=",           "first"}},
 --  all result states
     result_d = {
         {"[-%d.sabc]",  "value"},
         {"[*/+~^,AS=]", "operation"},
-        {"f",           "result_f"}},
+        {"f",           "result_f", remove_frc}},
     result_f = {
         {"[-%d.sabc]",  "value"},
         {"[*/+~^,AS=]", "operation"},
-        {"f",           "result_d"}},
+        {"f",           "result_d", remove_frc}},
 }
 
 for _, state in pairs(state_t) do

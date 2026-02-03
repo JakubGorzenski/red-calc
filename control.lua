@@ -4,6 +4,7 @@
 
 require "calc_layout"
 require "calc_input"
+require "calc_core"
 require "calc_display"
 
 function toggle_red_calc(event)
@@ -28,7 +29,6 @@ function toggle_red_calc(event)
     end
 end
 
-prec = "%.2f"
 function button_handler(event)
     local button = event.element
 
@@ -41,16 +41,22 @@ function button_handler(event)
         return
     end
 
+    local p_storage = storage[event.player_index]
+
     if button.type == "switch" then
-        prec = ({left="%.2f", none="%.4f", right="%.8f"})[button.switch_state]
+        p_storage.prec = ({left=100, none=10000, right=100000000})[button.switch_state]
+        return
     end
 
-    on_key_press(event.player_index, button.name:sub(2, 3))
+    if on_key_press(p_storage, button.name:sub(2, 3)) then
+        game.print(p_storage.input)
+        display(event.player_index, p_storage.input)
+    end
 end
 
 
 script.on_event(defines.events.on_player_created,
-    function(event) storage[event.player_index] = {} end)
+    function(event) storage[event.player_index] = { prec = 100 } end)
 
 script.on_event(defines.events.on_lua_shortcut,
     function(event) if event.prototype_name == "red-calc-toggle" then toggle_red_calc(event) end end)

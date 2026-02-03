@@ -1,4 +1,4 @@
---  contains calculator layout, and layout accessors
+--  contains calculator layout, and display accessor
 
 function access_player_display(player_index)
     return game.players[player_index].gui.screen.red_calc.dp_frame.display

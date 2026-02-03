@@ -17,8 +17,6 @@ function display(player_index, input)
 
     dp:clear()
 
-    dp.add{type="label", caption=input.."<"..(state)..">", style="red-calc-display"}
-
     local op1,                      op2,          num,          op3 = input:match(
         "([*/+~,^AS(]*)[-%d.fsabc]-([*/+~,^AS(]*)([-%d.fsabc]*)([*/+~,^AS(]*)$")
 
@@ -26,9 +24,10 @@ function display(player_index, input)
     op2 = op_format(":", op2)
     op3 = op_format("",  op3)
     --  using : as … bc sub(-4) interprets wchars as chars
-    local op_pre = ("    " .. op1 .. op2):sub(-4):gsub(":", "…")
+    local op_pre = ("    "..op1..op2):sub(-4):gsub(":", "…")
 
     dp.add{type="label", caption=op_pre..num..op3, style="red-calc-display"}
+    dp.add{type="label", caption="<"..state..">"..input, style="red-calc-display"}
 end
 
 function display_old(dp, mp_num)
