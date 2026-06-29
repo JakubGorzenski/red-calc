@@ -70,13 +70,6 @@ data.raw["gui-style"]["default"]["red-calc_blue_button_2"] = {
     left_click_sound = "__core__/sound/gui-tool-button.ogg",
 }
 
-data.raw["gui-style"]["default"]["red-calc_settings_table"] = {
-    type = "table_style",
-    parent = "table",
-    column_widths = {width=80},
-    --column_alignments = {{column=1, alignment="center"}},
-}
-
 data.raw["gui-style"]["default"]["red-calc_packed_flow"] = {
     type = "vertical_flow_style",
     parent = "vertical_flow",
