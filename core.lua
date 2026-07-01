@@ -1,3 +1,5 @@
+require "fcd"
+
 function OperationEntry(arg)
     arg.number     = arg.number     or ""
     arg.rq_op      = arg.rq_op      or " "
@@ -17,9 +19,6 @@ function Context()
     return C
 end
 
-function sign(x)
-    return (x > 0 and 1) or (x < 0 and -1) or 0
-end
 function at(array, index, default)
     if index < 0 then
         index = #array + index + 1
@@ -99,17 +98,15 @@ function string_round(arg)
     end
 
     local separator = "/"
-    local ch_sign = ""
+    local sign = ""
     if arg.visual then
         separator = " "
-        ch_sign = " "
+        sign = " "
     end
 
-    local sign = 1
     if string:find("-") then
         string = string:sub(2)
-        ch_sign = "-"
-        sign = -1
+        sign = "-"
     end
 
     local fraction = table.pack(select(3, string:find("^([^/]*)/?([^/]*)/?([^/]*)")))
@@ -123,16 +120,18 @@ function string_round(arg)
     local ret_float
 
     if decimal_part then
-        whole = tonumber(whole)
+        if whole:find("[^%d]") or whole == "" then
+            whole = nil
+        end
 
         if calculated then
             decimal_part = decimal_part:sub(1, C.precision)
         end
         if     fraction.n == 1 then
             ret_string = ("%s.%s"):format(whole or "", decimal_part)
-            ret_float = tonumber(ret_string)
+            ret_float = fcd(ret_string)
         elseif fraction.n == 2 then
-            if whole == 0 then
+            if tonumber(whole) == 0 then
                 whole = nil
             end
             local n, d
@@ -151,28 +150,24 @@ function string_round(arg)
             else
                 ret_string = ("%s%s/%s"):format(whole and whole .. separator or "", n, d)
             end
-            ret_float = (whole or 0) + n / d
+            ret_float = fcd_add(fcd(whole), fcd(n / d))
         end
 
     elseif fraction.n == 1 then
         ret_string = string
-        ret_float  = fraction[1] or 0
+        ret_float  = fcd(fraction[1] or 0)
     elseif fraction.n == 2 then
         ret_string = ("%s/%s"):format(fraction[1] and fraction[1] or "1", fraction[2] or "")
-        ret_float  = (fraction[1] or 1) / (fraction[2] or 1)
+        ret_float  = fcd_div(fcd(fraction[1] or 1), fcd(fraction[2] or 1))
     elseif fraction.n == 3 then
         ret_string = ("%s%s%s/%s"):format(fraction[1] or "1", separator, fraction[2] or "1", fraction[3] or "")
-        ret_float  = (fraction[1] or 1) + (fraction[2] or 1) / (fraction[3] or 1)
+        ret_float  = fcd_add(fcd(fraction[1] or 1), fcd_div(fcd(fraction[2] or 1), fcd(fraction[3] or 1)))
     end
 
     if arg.to_float then
-        if arg.check_if_fraction then
-            return ret_float * sign, fraction.n > 1 and 2 or ret_float % 1 == 0 and 1 or 0
-        else
-            return ret_float * sign
-        end
+        return ret_float, sign, fraction.n > 1 and 2 or fcd_is_int(ret_float) and 1 or 0
     else
-        return ch_sign .. ret_string
+        return sign .. ret_string
     end
 end
 function insert_number_memory(C, equals, bracket, number)
@@ -195,8 +190,8 @@ function calculate(arg)
                 C.question_mark = "?"
                 return nil
             end
-            curr.number, cn_frc = string_round{C, curr, to_float=true, check_if_fraction=true}
-            curr.number = ("%.9f"):format(curr.number)
+            curr.number, cn_sign, cn_frc = string_round{C, curr, to_float=true}
+            curr.number = cn_sign..fcd_to_string(curr.number)
             curr.calculated = true
             insert_number_memory(C, arg.equals, prev.bracket, curr.number .. (cn_frc >= 2 and "/" or ""))
             return curr
@@ -204,37 +199,51 @@ function calculate(arg)
         return nil
     end
 
-    local a, a_frc = string_round{C, prev, to_float=true, check_if_fraction=true}
+    local a, a_sign, a_frc = string_round{C, prev, to_float=true}
     local op = prev.rq_op
-    local b, b_frc = string_round{C, curr, to_float=true, check_if_fraction=true}
+    local b, b_sign, b_frc = string_round{C, curr, to_float=true}
 
     local frc = a_frc + b_frc > 2 and "/" or ""
-    local result = nil
+    local result = fcd_ZERO
+    local r_sign = a_sign
 
-    if     op == "+" then
-        result = a + b
-    elseif op == "−" then
-        result = a - b
+    if     op == "+" or op == "−" then
+        if b_sign ~= a_sign then
+            op = op == "+" and "−" or "+"
+        end
+
+        if op == "+" then
+            result = fcd_add(a, b)
+        else
+            if fcd_cmp(a, b) < 0 then
+                result = fcd_sub(b, a)
+                r_sign = a_sign == "-" and "" or "-"
+            else
+                result = fcd_sub(a, b)
+            end
+        end
     elseif op == "×" then
-        result = a * b
+        result = fcd_mul(a, b)
+        r_sign = a_sign ~= b_sign and "-" or ""
     elseif op == "^" then
-        result = a ^ b
+        result = fcd_pow(a, b)
     elseif op == "÷" or op == "\\" then
         if op == "\\" then
             a, b = b, a
         end
 
-        if b ~= 0.0 then
-            result = a / b
+        if fcd_cmp(b, fcd_ZERO) ~= 0 then
+            result = fcd_div(a, b)
+            r_sign = a_sign ~= b_sign and "-" or ""
         else
-            result = sign(a)
+            result = fcd(fcd_cmp(a, fcd_ZERO))
         end
     end
 
     if arg.return_result then
         prev = OperationEntry{}
     end
-    prev.number = ("%.9f%s"):format(result, frc)
+    prev.number = r_sign..fcd_to_string(result)..frc
     prev.calculated = true
 
     if not arg.return_result then
@@ -260,16 +269,16 @@ function update_display(C, is_test)
     local prev  = previous_operation(C)
     local curr  = current_operation(C)
 
-    local line_3 = curr.rq_op .. curr.bracket .. "                           " -- space for alignment
+    local line_3 = curr.rq_op .. curr.bracket .. "                              " -- space for alignment
     local line_2 = "NOT ASSIGNED!"
     local line_1 = "NOT ASSIGNED!"
 
-    if line_3 ~= "                             " then
+    if line_3 ~= "                                " then
         local calc = calculate{C, return_result=true}
         if calc then
-            line_1 = ("%s%s%-25s%s"):format(prev2.rq_op, prev2.bracket, string_round{C, calc, visual=true}, C.question_mark)
+            line_1 = ("%s%s%-28.28s%s "):format(prev2.rq_op, prev2.bracket, string_round{C, calc, visual=true}, C.question_mark)
         else
-            line_1 = ("%s%s%-25s%s"):format(prev.rq_op, prev.bracket, string_round{C, curr, visual=true}, C.question_mark)
+            line_1 = ("%s%s%-28.28s%s "):format(prev.rq_op, prev.bracket, string_round{C, curr, visual=true}, C.question_mark)
         end
         line_2 = line_3
     else
@@ -277,16 +286,16 @@ function update_display(C, is_test)
         if at(curr.number, 1, ""):find("^[ABC]") then
             memory_location = ("[%-2s]"):format(curr.number:gsub("/", ""))
         end
-        line_1 = ("%s%s%-25s%s"):format(prev2.rq_op, prev2.bracket, string_round{C, prev, visual=true}, C.question_mark)
-        line_2 = ("%s%s%-23s%s") :format(prev.rq_op,  prev.bracket,  string_round{C, curr, visual=true}, memory_location)
+        line_1 = ("%s%s%-28.28s%s "):format(prev2.rq_op, prev2.bracket, string_round{C, prev, visual=true}, C.question_mark)
+        line_2 = ("%s%s%-26.26s%s") :format(prev.rq_op,  prev.bracket,  string_round{C, curr, visual=true}, memory_location)
     end
     
     if is_test then
-        return line_1 .. " \n" .. line_2
+        return line_1 .. "\n" .. line_2
     end
 
     --testing externally requires disabling
-    display(C, line_1, C.greyed_out, line_2)
+    --display(C, line_1, C.greyed_out, line_2)
 end
 
 
@@ -500,7 +509,7 @@ end
 
 function run_tests()
     local test_result = "["
-    function test(in_sequence, output)
+    local function test(in_sequence, output)
         local TC = Context()
 
         if pcall(function()
@@ -523,9 +532,9 @@ function run_tests()
             else
                 test_result = test_result .. "/"
                 print("Fail \""..in_sequence.."\":")
-                print(result:gsub(" ", "`"))
+                print(result:gsub("% ", "`"))
                 print("Expected:")
-                print(output:gsub(" ", "`"))
+                print(output:gsub("% ", "`"))
                 print("")
             end
         end) then
@@ -533,41 +542,45 @@ function run_tests()
             test_result = test_result .. "!"
             print("Fail \""..in_sequence.."\":")
             print("Expected:")
-            print(output:gsub(" ", "`"))
+            print(output:gsub("% ", "`"))
             print("")
         end
     end
 --  change \\ to sth else ?
-    test("",                "                             \n                             ")
-    test("1+23dddd",        "                             \n                             ")
-    test("$/6=",            "                             \n   0.16666666                ")
-    test("$/6=/",           "                             \n   1/6                       ")
-    test("$1:6=/",          "                             \n   1/6                       ")
-    test("%/3=/",           "                             \n   1/3                       ")
-    test("/2+0=",           "   1/2                       \n+  0                         ")
-    test("/2+0=cA/",        "                             \n   0.50                  [A ]")
-    test("A5",              "                           ? \n   0.00                  [A ]")
-    test("/2=cA",           "                             \n   1/2                   [A ]")
-    test(".6900/",          "                             \n   69/100                    ")
-    test("$.00000001/=",    "                             \n   0.00000001                ")
-    test("1+(2*",           "+( 2                         \n×                            ")
-    test("1:0+",            "   1.00                      \n+                            ")
-    test("%2=/",            "                             \n   2                         ")
-    test("@1.33//",         "                             \n   1.33                      ")
-    test("@1/3=//",         "                             \n   0.3333                    ")
-    test("0=/",             "                             \n   0                         ")
-    test("A+",              "   0.00                      \n+                            ")
-    test("@1:(0.0001=+!",   "   1.00                      \n+                            ")
-    test("A.",              "                           ? \n   0.00                  [A ]")
-    test(".01/101",         "                             \n   2/101                     ")
-    test("00.1/",           "                             \n   1/10                      ")
-    test("1+(2*3+B",        "+( 6.00                      \n+  0.00                  [B ]")
-    test("2+2=S",           "   4.00                    ? \n+  2                         ")
-    test("^1.2/3",          "                             \n   4/3                       ")
-    test("//2",             "                             \n   1 1/2                     ")
-    test("///",             "                           ? \n   1 1/                      ")
-    test("1+2-3",           "   3.00                      \n−  3                         ")
-    test("12*//2",          "   18                        \n+  1 1/2                     ")
+test("100**100=", "")
+    test("",                "                                \n                                ")
+    test("1+23dddd",        "                                \n                                ")
+    test("$/6=",            "                                \n   0.16666666                   ")
+    test("$/6=/",           "                                \n   1/6                          ")
+    test("$1:6=/",          "                                \n   1/6                          ")
+    test("%/3=/",           "                                \n   1/3                          ")
+    test("/2+0=",           "   1/2                          \n+  0                            ")
+    test("/2+0=cA/",        "                                \n   0.50                     [A ]")
+    test("A5",              "                              ? \n   0.00                     [A ]")
+    test("/2=cA",           "                                \n   1/2                      [A ]")
+    test(".6900/",          "                                \n   69/100                       ")
+    test("$.00000001/=",    "                                \n   0.00000001                   ")
+    test("1+(2*",           "+( 2                            \n×                               ")
+    test("1:0+",            "   1.00                         \n+                               ")
+    test("%2=/",            "                                \n   2                            ")
+    test("@1.33//",         "                                \n   1.33                         ")
+    test("@1/3=//",         "                                \n   0.3333                       ")
+    test("0=/",             "                                \n   0                            ")
+    test("A+",              "   0.00                         \n+                               ")
+    test("@1:(0.0001=+!",   "   1.00                         \n+                               ")
+    test("A.",              "                              ? \n   0.00                     [A ]")
+    test(".01/101",         "                                \n   2/101                        ")
+    test("00.1/",           "                                \n   1/10                         ")
+    test("1+(2*3+B",        "+( 6.00                         \n+  0.00                     [B ]")
+    test("2+2=S",           "   4.00                       ? \n+  2                            ")
+    test("^1.2/3",          "                                \n   4/3                          ")
+    test("//2",             "                                \n   1 1/2                        ")
+    test("///",             "                              ? \n   1 1/                         ")
+    test("1+2-3",           "   3.00                         \n−  3                            ")
+    test("12*//2=",         "   18                           \n×  1 1/2                        ")
+    test("-2-1=",           "  -3.00                         \n−  1                            ")
+    test("2*-2=",           "  -4.00                         \n× -2                            ")
+    test("$100**100==",     "   99999999999999.99999999      \n^  100                          ")
 
     print(test_result .. "]")
 end

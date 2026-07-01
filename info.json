@@ -1,9 +1,9 @@
 {
     "name": "red-calc",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "title": "Red Calculator",
     "author": "kuba05",
     "factorio_version": "2.1",
     "dependencies": [],
-    "description": "Mod that adds calculator."
+    "description": "Mod that adds a calculator."
 }
